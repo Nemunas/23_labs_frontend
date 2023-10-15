@@ -2,7 +2,7 @@
   <main>    
     <video ref="videoElement" autoplay playsinline style="position: absolute; width: 100%; height: 100%; object-fit: cover;"></video>
     <div class="content" style="position: fixed; bottom: 64px; width:100%; z-index: 1;">
-      <div class="card" style="width:260px; margin:auto;">
+      <div class="card" style="width:340px; margin:auto;">
         <div style="display:flex; flex-direction:column; padding-bottom:12px;padding-top:0px;">
           Please select a target language:
           <select v-model="selectedLanguage" style="margin-top:4px">
@@ -12,15 +12,21 @@
             </option>
           </select>      
         </div>
-        <button @click="captureImage(); getResults()" style="width:100%">Get Results</button>            
+        selectedImage: {{selectedImage}}
+        selectedLanguage: {{selectedLanguage}}
+        <button @click="captureImageAndGetResults()" style="width:100%">Get Results</button>            
+        <audio ref="audioElement" controls style="width:100%; margin-top:12px"></audio>
+
       </div>
     </div>
-  <canvas ref="canvas" style="display: none;"></canvas> 
+  <canvas ref="canvas" style="display: none;"></canvas>   
   </main>
 </template>
 
 <script>
 import { ref, onMounted, onBeforeUnmount } from 'vue';
+import axios from 'axios';
+
 
 export default {
   onBeforeUnmount(){
@@ -32,24 +38,53 @@ export default {
     this.initCamera()
   },
   methods: {
-    getResults() {
-      if (!selectedImage.value || !selectedLanguage.value) {
+    getResults() {      
+      console.log('!this.selectedImage', !this.selectedImage)
+      console.log('this.selectedImage', this.selectedImage)
+            
+      console.log('!this.selectedLanguage', !this.selectedLanguage)
+      if (!this.selectedImage || !this.selectedLanguage) {
         alert('Please select a language and upload an image');
         return;
       }
       let formData = new FormData();
-      formData.append('language', selectedLanguage.value);
-      formData.append('image', selectedImage.value);
-      axios.post(backendURL, formData, {
+      formData.append('language', this.selectedLanguage);
+      formData.append('image', this.selectedImage);
+      axios.post(this.backendURL, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
       }).then(response => {
         console.log(response.data);
+        let audioData = response.data.audio_bytes;
+        let audioBlob = this.base64ToBlob(audioData, 'audio/mpeg');
+        let audioUrl = URL.createObjectURL(audioBlob);
+        this.$refs.audioElement.src = audioUrl;
       }).catch (error => {
         console.error(error);
       })
     },
+    base64ToBlob(base64, mime) {
+      mime = mime || '';
+      var sliceSize = 1024;
+      var byteChars = window.atob(base64);
+      var byteArrays = [];
+
+      for (var offset = 0, len = byteChars.length; offset < len; offset += sliceSize) {
+        var slice = byteChars.slice(offset, offset + sliceSize);
+
+        var byteNumbers = new Array(slice.length);
+        for (var i = 0; i < slice.length; i++) {
+          byteNumbers[i] = slice.charCodeAt(i);
+        }
+
+        var byteArray = new Uint8Array(byteNumbers);
+
+        byteArrays.push(byteArray);
+      }
+
+      return new Blob(byteArrays, {type: mime});
+    },    
     initCamera() {
       navigator.mediaDevices.getUserMedia({ video: true })
         .then(stream => {
@@ -60,14 +95,17 @@ export default {
           console.error("Error accessing the camera:", err);
         });
     },
-    captureImage() {
+    captureImageAndGetResults() {
+      console.log('capturing image')
       const canvas = this.$refs.canvas;
       const video = this.$refs.videoElement;
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       canvas.getContext('2d').drawImage(video, 0, 0);
       canvas.toBlob(blob => {
-        selectedImage.value = new File([blob], "image.jpg", { type: "image/jpeg" });
+        console.log('capturing image')
+        this.selectedImage = new File([blob], "image.jpg", { type: "image/jpeg" });
+        this.getResults()
       }, 'image/jpeg');      
     }
   },
