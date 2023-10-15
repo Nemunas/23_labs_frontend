@@ -3,20 +3,34 @@
     <video ref="videoElement" autoplay playsinline style="position: absolute; width: 100%; height: 100%; object-fit: cover;"></video>
     <div class="content" style="position: fixed; bottom: 64px; width:100%; z-index: 1;">
       <div class="card" style="width:340px; margin:auto;">
-        <div style="display:flex; flex-direction:column; padding-bottom:12px;padding-top:0px;">
-          Please select a target language:
-          <select v-model="selectedLanguage" style="margin-top:4px">
-            <option value="">Please select a language</option>
-            <option v-for="language in languages" :key="language" :value="language">
-              {{ language }}
-            </option>
-          </select>      
-        </div>
-        selectedImage: {{selectedImage}}
-        selectedLanguage: {{selectedLanguage}}
-        <button @click="captureImageAndGetResults()" style="width:100%">Get Results</button>            
-        <audio ref="audioElement" controls style="width:100%; margin-top:12px"></audio>
-
+        <!-- loading: {{loading}}<br>
+        showAudio: {{showAudio}} -->
+        <span v-if="!loading">
+          <div style="display:flex; flex-direction:column; padding-bottom:12px;padding-top:0px;">
+            Please select a target language:
+            <select v-model="selectedLanguage" style="margin-top:4px">
+              <option value="">Please select a language</option>
+              <option v-for="language in languages" :key="language" :value="language">
+                {{ language }}
+              </option>
+            </select>      
+          </div>
+          <button @click="captureImageAndGetResults()" style="width:100%">Get Results</button>                      
+        </span>
+        <span v-else>
+          loading...
+        </span> 
+        <div v-if="showAudio" style="display:flex; flex-direction:column; width:100%">
+          transcript (english): {{transcriptEnglish}}<br>
+          transcript (language): {{transcriptTranslated}}
+        </div>       
+        <audio 
+          ref="audioElement" 
+          controls      
+          autoplay     
+          preload="auto"          
+          :style="{ display: showAudio ? 'inherit' : 'none', marginTop: '12px', width: '100%'}"
+        ></audio>
       </div>
     </div>
   <canvas ref="canvas" style="display: none;"></canvas>   
@@ -35,7 +49,11 @@ export default {
     }    
   },
   mounted(){    
-    this.initCamera()
+    this.initCamera();
+    this.$refs.audioElement.addEventListener('ended', () => {
+      this.$refs.audioElement.currentTime = 0;
+      // this.$refs.audioElement.play();
+    });
   },
   methods: {
     getResults() {      
@@ -59,9 +77,17 @@ export default {
         let audioData = response.data.audio_bytes;
         let audioBlob = this.base64ToBlob(audioData, 'audio/mpeg');
         let audioUrl = URL.createObjectURL(audioBlob);
+
+        this.transcriptEnglish = response.data.transcript
+        this.transcriptTranslated = response.data.transcript_translated
+        this.loading=false;
+        this.showAudio=true;        
         this.$refs.audioElement.src = audioUrl;
+        this.$refs.audioElement.play().catch(error => console.error("Playback failed:", error));
       }).catch (error => {
         console.error(error);
+        this.loading=false;
+        this.showAudio=false;        
       })
     },
     base64ToBlob(base64, mime) {
@@ -97,6 +123,8 @@ export default {
     },
     captureImageAndGetResults() {
       console.log('capturing image')
+      this.showAudio=false;
+      this.loading=true;
       const canvas = this.$refs.canvas;
       const video = this.$refs.videoElement;
       canvas.width = video.videoWidth;
@@ -145,7 +173,11 @@ export default {
         "Tamil",
         "Ukrainian"
       ],
-      selectedLanguage: "English"
+      selectedLanguage: "French",
+      transcriptTranslated: "bar",
+      transcriptEnglish: "foo",
+      showAudio: false,
+      loading: false
     }
   } 
 }
