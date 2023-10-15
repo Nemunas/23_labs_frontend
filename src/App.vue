@@ -3,7 +3,7 @@
     <video ref="videoElement" autoplay playsinline style="position: absolute; width: 100%; height: 100%; object-fit: cover;"></video>
     <div class="content" style="position: fixed; bottom: 64px; width:100%; z-index: 1;">
       <div class="card" style="width:260px; margin:auto;">
-        <div style="display:flex; flex-direction:column; padding-bottom:12px;">
+        <div style="display:flex; flex-direction:column; padding-bottom:12px;padding-top:0px;">
           Please select a target language:
           <select v-model="selectedLanguage" style="margin-top:4px">
             <option value="">Please select a language</option>
@@ -23,49 +23,44 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue';
 
 export default {
-  setup() {
-    const backendURL = 'http://localhost:3000/api';
-    const selectedImage = ref(null);
-    const getResults = async () => {
-      if (!selectedImage.value || !this.selectedLanguage) {
+  onBeforeUnmount(){
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+    }    
+  },
+  mounted(){    
+    this.initCamera()
+  },
+  methods: {
+    getResults() {
+      if (!selectedImage.value || !selectedLanguage.value) {
         alert('Please select a language and upload an image');
         return;
       }
       let formData = new FormData();
-      formData.append('language', this.selectedLanguage);
+      formData.append('language', selectedLanguage.value);
       formData.append('image', selectedImage.value);
-      try {
-        const response = await axios.post(backendURL, formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          }
-        });
+      axios.post(backendURL, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      }).then(response => {
         console.log(response.data);
-      } catch (error) {
+      }).catch (error => {
         console.error(error);
-      }
-    };
-    const videoElement = ref(null);
-    let stream = null;
-
-    const initCamera = async () => {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        videoElement.value.srcObject = stream;
-      } catch (err) {
-        console.error("Error accessing the camera:", err);
-      }
-    };
-
-    onMounted(initCamera);
-
-    onBeforeUnmount(() => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-    });
-
-    const captureImage = () => {
+      })
+    },
+    initCamera() {
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+          this.stream = stream;
+          this.$refs.videoElement.srcObject = stream;
+        })
+        .catch(err => {
+          console.error("Error accessing the camera:", err);
+        });
+    },
+    captureImage() {
       const canvas = this.$refs.canvas;
       const video = this.$refs.videoElement;
       canvas.width = video.videoWidth;
@@ -73,14 +68,16 @@ export default {
       canvas.getContext('2d').drawImage(video, 0, 0);
       canvas.toBlob(blob => {
         selectedImage.value = new File([blob], "image.jpg", { type: "image/jpeg" });
-      }, 'image/jpeg');
-    };
-
-    return { getResults, selectedImage, videoElement, captureImage };
+      }, 'image/jpeg');      
+    }
   },
   data() {
     return {
-      languages_list: [        
+      stream: null, 
+      videoElement: null, 
+      selectedImage: null,
+      backendURL: 'http://localhost:5000/',
+      languages: [        
         "English",
         "Japanese",
         "Chinese",
@@ -126,6 +123,9 @@ export default {
   padding: 8px;
   color:black;  
   border: 2px solid black;
+  padding-bottom:12px;
+  padding-left: 12px;
+  padding-right: 12px;
 }
 
 
